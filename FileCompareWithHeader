@@ -1,0 +1,85 @@
+import datetime
+import pandas as pd
+from pandas.util import hash_pandas_object
+
+Current_Date = datetime.datetime.now()
+print('Current_DateTime :', Current_Date)
+
+# Taking Input from User
+fileOne = input("Enter file1 path : ")
+fileTwo = input("Enter file2 path : ")
+dlmtr = input("Enter Delimiter : ")
+n = int(input("Enter number of Primary key : "))
+prmy = list(input("Enter Primary key : "). strip(). split(','))[:n]
+
+# Reading CSV File
+df = pd.read_csv(fileOne, delimiter=dlmtr, index_col=None, low_memory=False)
+df1 = pd.read_csv(fileTwo, delimiter=dlmtr, index_col=None, low_memory=False)
+
+len1 = len(df.index)
+len2 = len(df1.index)
+
+df.index += 1
+df1.index += 1
+
+print('Source Count :', len1)
+print('Target Count :', len2)
+
+if len1 != len2:
+    print("Count Mismatch", abs(len1 - len2))
+else:
+    print("Count Matched")
+
+# Sorting on Primary key
+sort1 = df.sort_values(prmy)
+sort2 = df1.sort_values(prmy)
+
+# Implementing Hashing for efficient comparision
+h = hash_pandas_object(sort1, index=False)
+h1 = hash_pandas_object(sort2, index=False)
+
+# Checking for Rows Mismatch
+r = h[~h.isin(h1)]
+r1 = h1[~h1.isin(h)]
+
+# Finding Location to know original Row by using index value of Hash Compare Result
+l1 = df.loc[r.index]
+l2 = df1.loc[r1.index]
+
+# Finding Rows on the basis of Primary Key
+index1 = pd.MultiIndex.from_arrays([l1[col] for col in prmy])
+index2 = pd.MultiIndex.from_arrays([l2[col] for col in prmy])
+
+s1 = l1.loc[index1.isin(index2)].reset_index()
+s2 = l2.loc[index2.isin(index1)].reset_index()
+
+# Finding Extra Rows
+s3 = l1.loc[~index1.isin(index2)]
+s4 = l2.loc[~index2.isin(index1)]
+
+# Concat
+f1=pd.concat([s1,s2], axis= 1)
+f2=pd.concat([s3,s4], axis=1).reset_index()
+
+print("Extra Rows Count:", len(f2.index))
+
+# Write Result into CSV File ("Row_Output.csv") and for Extra Row ("Extra_Row_Output.csv")
+f1.to_csv("Row_Output.csv")
+f2.to_csv("Extra_Row_Output.csv")
+
+# Finding Column Value Mismatch
+result = s1.compare(s2)
+res = result.rename(columns={'self': 'Source', 'other': 'Target'})
+
+# Removing NaN by Space
+rslt = res.fillna(" ")
+
+# writing Column Value Mismatch into CSV File("Col_output.csv")
+rslt.to_csv("Col_output.csv")
+
+# Finding Cell Value Mismatch Count
+s= res.count()
+count = (s.sum() - (len(res.index)*2))/ 2
+print("Cell Value Mismatch : ", count)
+print("Please Refer :\nFor Row level value : Row_Output.csv  \nFor Extra Row value : Extra_Row_Output.csv \nFor "
+      "Column level value : Col_output.csv")
